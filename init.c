@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <libgen.h>
 #include <dlfcn.h>
+#include <errno.h>
 #include <sys/param.h>
 
 #include "common.h"
@@ -52,7 +53,52 @@ int bootstrap()
     return 0;
 }
 
+static void init_locale_path(void)
+{
+    int olderr = errno;
+    char* resolved = NULL;
+    if(issetugid() || !__roothideinit_JBROOT)
+        goto out;
+
+    const char* path = getenv("PATH_LOCALE");
+    if(!path) {
+        path = "/usr/share/locale";
+    } else {
+        const char* defaults[] = {"/usr/share/locale", "/usr/local/share/locale"};
+        int translate = 0;
+        for(size_t i=0; i<sizeof(defaults)/sizeof(defaults[0]); i++) {
+            size_t length = strlen(defaults[i]);
+            if(strncmp(path, defaults[i], length) == 0 &&
+               (path[length] == '\0' || path[length] == '/')) {
+                translate = 1;
+                break;
+            }
+        }
+        if(!translate)
+            goto out;
+    }
+
+    size_t root_length = strlen(__roothideinit_JBROOT);
+    size_t path_length = strlen(path);
+    /* Apple libc reserves two slashes, ENCODING_LEN (31), CATEGORY_LEN (11). */
+    size_t max_length = PATH_MAX - 44;
+    if(root_length >= max_length || path_length >= max_length - root_length)
+        goto out;
+
+    resolved = malloc(root_length + path_length + 1);
+    if(!resolved)
+        goto out;
+    memcpy(resolved, __roothideinit_JBROOT, root_length);
+    memcpy(resolved + root_length, path, path_length + 1);
+    setenv("PATH_LOCALE", resolved, 1);
+out:
+    free(resolved);
+    errno = olderr;
+}
+
 static void __attribute__((__constructor__)) _roothide_init()
 {
     assert(bootstrap() == 0);
+    /* Supply the native directory before libc caches PATH_LOCALE on first use. */
+    init_locale_path();
 }
