@@ -35,6 +35,7 @@
 
 #include "roothide.h"
 #include "common.h"
+#include "vroot_shm_name.h"
 
 #define jbrootat_alloc(a,b,c) jbrootat_alloc(a,b)
 
@@ -273,19 +274,41 @@ VROOT_LOG("@%s %s %d %s\n",__FUNCTION__, name1, fd, name2);
     return ret;
 }
 
-int VROOT_API_NAME(shm_open)(const char * path, int flags, ...)
+int VROOT_API_NAME(shm_open)(const char *name, int flags, ...)
 {
-VROOT_LOG("@%s %s\n",__FUNCTION__, path);
+    int saved_errno = errno;
+    VROOT_LOG("@%s %s\n", __FUNCTION__, name);
 
     mode_t mode = 0;
-    va_list ap;
-    va_start(ap, flags);
-    mode = va_arg(ap, int);
-    va_end(ap);
-    const char* newpath = jbroot_alloc(path);
-    int ret = shm_open(newpath, flags, mode);
-    if(newpath) free((void*)newpath);
-    return ret;
+    if (flags & O_CREAT) {
+        va_list ap;
+        va_start(ap, flags);
+        mode = va_arg(ap, int);
+        va_end(ap);
+    }
+
+    char mapped[VROOT_SHM_NAME_MAX + 1];
+    if (vroot_shm_name(name, jbrand(), mapped) == -1)
+        return -1;
+
+    errno = saved_errno;
+    return shm_open(mapped, flags, mode);
+}
+
+int VROOT_API_NAME(shm_unlink)(const char *name)
+{
+    int saved_errno = errno;
+    VROOT_LOG("@%s %s\n", __FUNCTION__, name);
+
+    char mapped[VROOT_SHM_NAME_MAX + 1];
+    if (vroot_shm_name(name, jbrand(), mapped) == -1) {
+        /* XNU shm_unlink reports EINVAL for every invalid-name error. */
+        errno = EINVAL;
+        return -1;
+    }
+
+    errno = saved_errno;
+    return shm_unlink(mapped);
 }
 
 sem_t* VROOT_API_NAME(sem_open)(const char *path, int flags, ...)

@@ -250,7 +250,7 @@ VROOT_API_DEF(int, getfsstat64, (struct statfs64 *buf, int bufsize, int mode)) /
 /* mman.h */
 VROOT_API_DEF(int, shm_open, (const char * path, int flags, ...))
 
-VROOT_API_WRAP(int, shm_unlink, (const char * path), (newpath), path)
+VROOT_API_DEF(int, shm_unlink, (const char *name))
 
 /* semaphore */
 VROOT_API_DEF(sem_t*, sem_open, (const char *path, int flags, ...))
