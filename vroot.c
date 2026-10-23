@@ -1,8 +1,10 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <dlfcn.h>
 #include <spawn.h>
 #include <utime.h>
@@ -891,20 +893,53 @@ int VROOT_API_NAME(_NSGetExecutablePath)(char* buf, uint32_t* bufsize)
 {
 VROOT_LOG("@%s\n",__FUNCTION__);
 
-    uint32_t oldsize = *bufsize; 
-    int ret = _NSGetExecutablePath(buf, bufsize);
-    if(ret == 0) {
-        const char* newpath = rootfs_alloc(buf);
-        int newsize = strlen(newpath);
-        if(newsize < oldsize) {
-            strcpy(buf, newpath);
-        } else {
-            *bufsize = newsize+1;
-            ret = -1;
-        }
-        free((void*)newpath);
+    if(!bufsize) {
+        errno = EINVAL;
+        return -1;
     }
-    return ret;
+
+    uint32_t capacity = *bufsize;
+    uint32_t physical_size = 0;
+    if(_NSGetExecutablePath(NULL, &physical_size) != -1 || !physical_size) {
+        errno = EIO;
+        return -1;
+    }
+
+    char* physical_path = malloc(physical_size);
+    if(!physical_path) {
+        errno = ENOMEM;
+        return -1;
+    }
+    uint32_t physical_capacity = physical_size;
+    if(_NSGetExecutablePath(physical_path, &physical_size) != 0 ||
+       !memchr(physical_path, '\0', physical_capacity)) {
+        free(physical_path);
+        errno = EIO;
+        return -1;
+    }
+
+    const char* newpath = rootfs_alloc(physical_path);
+    free(physical_path);
+    if(!newpath) {
+        errno = ENOMEM;
+        return -1;
+    }
+    size_t length = strlen(newpath);
+    if(length >= UINT32_MAX) {
+        free((void*)newpath);
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+
+    uint32_t required = (uint32_t)length + 1;
+    if(!buf || capacity < required) {
+        *bufsize = required;
+        free((void*)newpath);
+        return -1;
+    }
+    memcpy(buf, newpath, required);
+    free((void*)newpath);
+    return 0;
 }
 
 
