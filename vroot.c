@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <dirent.h>
 #include <copyfile.h>
+#include <sys/clonefile.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/mount.h>

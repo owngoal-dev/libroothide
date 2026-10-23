@@ -257,6 +257,9 @@ VROOT_API_DEF(sem_t*, sem_open, (const char *path, int flags, ...))
 
 VROOT_API_WRAP(int, sem_unlink, (const char * path), (newpath), path)
 
+/* sys/clonefile.h */
+VROOTAT_API_WRAP(int, fclonefileat, (int srcfd, int dstfd, const char *path, uint32_t flags), (srcfd, dstfd, newpath, flags), dstfd, path, 0)
+
 /* copyfile.h */
 VROOT_API_DEF(int, copyfile, (const char * from, const char * to, copyfile_state_t state, copyfile_flags_t flags))
 
