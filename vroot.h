@@ -297,6 +297,7 @@ VROOT_API_DEF(void*, _ZNSt3__114basic_ofstreamIcNS_11char_traitsIcEEE4openERKNS_
 /* sys/socket.h */
 VROOT_API_DEF(int, bind, (int sockfd, const struct sockaddr *addr, socklen_t addrlen))
 VROOT_API_DEF(int, connect, (int sockfd, const struct sockaddr *addr, socklen_t addrlen))
+VROOT_API_DEF(ssize_t, sendto, (int sockfd, const void *buffer, size_t length, int flags, const struct sockaddr *addr, socklen_t addrlen))
 VROOT_API_DEF(int, getpeername,(int sockfd, struct sockaddr *addr, socklen_t* addrlen))
 VROOT_API_DEF(int, getsockname, (int sockfd, struct sockaddr *addr, socklen_t* addrlen))
 

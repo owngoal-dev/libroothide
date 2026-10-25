@@ -537,73 +537,82 @@ VROOT_LOG("@%s %d %d\n",__FUNCTION__, fd, cmd);
     return ret;
 }
 
+/* Keep the translated address alive until the caller's socket operation ends. */
+static int vroot_unix_address(const struct sockaddr *addr, socklen_t addrlen,
+                             struct sockaddr_un *translated, socklen_t *translated_len)
+{
+    const size_t path_offset = offsetof(struct sockaddr_un, sun_path);
+    if (!addr || addrlen < offsetof(struct sockaddr, sa_family) + sizeof(addr->sa_family))
+        return 0;
+    if (addr->sa_family != AF_UNIX || addrlen <= path_offset)
+        return 0;
+    /* Leave extended addresses to the kernel instead of inventing errors. */
+    if (addrlen > sizeof(struct sockaddr_un))
+        return 0;
+
+    const struct sockaddr_un *unix_addr = (const struct sockaddr_un *)addr;
+    size_t path_len = strnlen(unix_addr->sun_path, addrlen - path_offset);
+    if (!path_len)
+        return 0;
+    char path[sizeof(unix_addr->sun_path) + 1];
+    memcpy(path, unix_addr->sun_path, path_len);
+    path[path_len] = '\0';
+
+    int saved_errno = errno;
+    const char *mapped = jbroot_alloc(path);
+    if (!mapped) {
+        errno = ENOMEM;
+        return -1;
+    }
+    size_t mapped_len = strlen(mapped);
+    if (mapped_len > sizeof(translated->sun_path)) {
+        free((void *)mapped);
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    memset(translated, 0, sizeof(*translated));
+    translated->sun_family = AF_UNIX;
+    memcpy(translated->sun_path, mapped, mapped_len);
+    free((void *)mapped);
+    *translated_len = (socklen_t)(path_offset + mapped_len);
+    translated->sun_len = *translated_len;
+    errno = saved_errno;
+    return 1;
+}
+
 int VROOT_API_NAME(bind)(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
-VROOT_LOG("@%s %d\n",__FUNCTION__, sockfd);
-
-    struct sockaddr_un *addr_un = (struct sockaddr_un *)(addr);
-    if (addr_un->sun_family == AF_UNIX && addr_un->sun_path[0]) {
-        socklen_t newaddrlen;
-        struct sockaddr_un newaddr_un;
-
-        
-        const int af_unix_path_max = sizeof(addr_un->sun_path);
-        const char *path = addr_un->sun_path;
-
-        const char* newpath = jbroot_alloc(path);
-        
-        memset(&newaddr_un, 0, sizeof(struct sockaddr_un));
-        newaddr_un.sun_family = addr_un->sun_family;
-        strlcpy(newaddr_un.sun_path, newpath, sizeof(newaddr_un.sun_path));
-        
-        free((void*)newpath);
-        
-        if (strlen(newpath) >= af_unix_path_max) {
-            abort();
-            errno = (ENAMETOOLONG);
-            return -1;
-        }
-        
-        addrlen = (socklen_t)SUN_LEN(&newaddr_un);
-        addr = (struct sockaddr *)&newaddr_un;
-    }
-    
-    return bind(sockfd, addr, addrlen);
+    struct sockaddr_un translated;
+    socklen_t translated_len;
+    int mapped = vroot_unix_address(addr, addrlen, &translated, &translated_len);
+    if (mapped < 0)
+        return -1;
+    return bind(sockfd, mapped ? (const struct sockaddr *)&translated : addr,
+                mapped ? translated_len : addrlen);
 }
 
 int VROOT_API_NAME(connect)(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
-VROOT_LOG("@%s %d\n",__FUNCTION__, sockfd);
+    struct sockaddr_un translated;
+    socklen_t translated_len;
+    int mapped = vroot_unix_address(addr, addrlen, &translated, &translated_len);
+    if (mapped < 0)
+        return -1;
+    return connect(sockfd, mapped ? (const struct sockaddr *)&translated : addr,
+                   mapped ? translated_len : addrlen);
+}
 
-    struct sockaddr_un *addr_un = (struct sockaddr_un *)(addr);
-    if (addr_un->sun_family == AF_UNIX && addr_un->sun_path[0]) {
-        socklen_t newaddrlen;
-        struct sockaddr_un newaddr_un;
-
-        
-        const int af_unix_path_max = sizeof(addr_un->sun_path);
-        const char *path = addr_un->sun_path;
-
-        const char* newpath = jbroot_alloc(path);
-VROOT_LOG("@%s %s : %s\n",__FUNCTION__, path, newpath);
-        
-        memset(&newaddr_un, 0, sizeof(struct sockaddr_un));
-        newaddr_un.sun_family = addr_un->sun_family;
-        strlcpy(newaddr_un.sun_path, newpath, sizeof(newaddr_un.sun_path));
-        
-        free((void*)newpath);
-        
-        if (strlen(newpath) >= af_unix_path_max) {
-            abort();
-            errno = (ENAMETOOLONG);
-            return -1;
-        }
-        
-        addrlen = (socklen_t)SUN_LEN(&newaddr_un);
-        addr = (struct sockaddr *)&newaddr_un;
-    }
-    
-    return connect(sockfd, addr, addrlen);
+ssize_t VROOT_API_NAME(sendto)(int sockfd, const void *buffer, size_t length, int flags,
+                             const struct sockaddr *addr, socklen_t addrlen)
+{
+    struct sockaddr_un translated;
+    socklen_t translated_len;
+    int mapped = vroot_unix_address(addr, addrlen, &translated, &translated_len);
+    if (mapped < 0)
+        return -1;
+    return sendto(sockfd, buffer, length, flags,
+                  mapped ? (const struct sockaddr *)&translated : addr,
+                  mapped ? translated_len : addrlen);
 }
 
 int VROOT_API_NAME(getpeername)(int sockfd, struct sockaddr *addr, socklen_t* addrlen)
