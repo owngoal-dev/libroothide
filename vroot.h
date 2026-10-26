@@ -49,10 +49,10 @@ VROOT_API_DEF(int, posix_spawnp, (pid_t * pid, const char * path, const posix_sp
 
 VROOT_API_WRAP(int, posix_spawn_file_actions_addopen, (posix_spawn_file_actions_t * file_actions,
 	   int fildes, const char *restrict path, int oflag, mode_t mode),
-       (file_actions,fildes,path,oflag,mode), path)
+       (file_actions,fildes,newpath,oflag,mode), path)
 
 VROOT_API_WRAP(int, posix_spawn_file_actions_addchdir_np, (posix_spawn_file_actions_t *restrict file_actions,
-	   const char *restrict	path), (file_actions,path), path)
+	   const char *restrict	path), (file_actions,newpath), path)
 
 
 /* fcntl.h  */
