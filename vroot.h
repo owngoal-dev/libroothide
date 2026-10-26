@@ -82,7 +82,7 @@ VROOT_API_WRAP(int, chown, (const char * path,uid_t uid, gid_t gid), (newpath,ui
 VROOT_API_WRAP(long, pathconf, (const char * path, int name), (newpath,name), path)
 VROOT_API_DEF(int, rmdir, (const char * path)) //dpkg remove packages
 VROOT_API_WRAP(int, unlink, (const char * path), (newpath), path)
-VROOT_API_WRAP(int, chroot, (const char * path), (newpath), path)
+VROOT_API_DEF(int, chroot, (const char * path))
 VROOT_API_WRAP(int, lchown, (const char * path,uid_t uid, gid_t gid), (newpath,uid,gid), path)
 VROOT_API_DEF(ssize_t, readlink, (const char * path, char* buf, size_t bufsiz))
 VROOT_API_WRAP(int, truncate, (const char *path,off_t length), (newpath,length), path)

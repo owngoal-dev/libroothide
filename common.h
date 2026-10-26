@@ -18,6 +18,9 @@ unsigned long long resolve_jbrand_value(const char* name);
 extern const char* __roothideinit_JBRAND;
 extern const char* __roothideinit_JBROOT;
 
+/* Internal transition shared by libvroot and libroothide. */
+EXPORT void __roothide_enter_chroot(void);
+
 #include <sys/syslog.h>
 #define SYSLOG(...) {openlog("roothide",LOG_PID,LOG_AUTH);syslog(LOG_DEBUG, __VA_ARGS__);closelog();}
 

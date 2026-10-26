@@ -11,9 +11,20 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/syslimits.h>
+#include <stdatomic.h>
+#include <stdbool.h>
 
 #define JBRAND  __roothideinit_JBRAND
 #define JBROOT  __roothideinit_JBROOT
+
+/* After a real chroot, paths belong to the kernel's new root namespace. */
+static atomic_bool chroot_active = false;
+
+EXPORT
+void __roothide_enter_chroot(void)
+{
+    atomic_store_explicit(&chroot_active, true, memory_order_release);
+}
 
 EXPORT
 unsigned long long jbrand() {
@@ -155,6 +166,9 @@ EXPORT
 const char* jbrootat_alloc(int fd, const char* path)
 {
     if(!path) return NULL;
+    if(atomic_load_explicit(&chroot_active, memory_order_acquire))
+        return strdup(path);
+
     
     const char* fixedpath = __private_jbrootat_alloc(fd, path);
     
@@ -338,6 +352,9 @@ EXPORT
 const char* rootfs_alloc(const char* path)
 {
     if(!path) return path;
+    if(atomic_load_explicit(&chroot_active, memory_order_acquire))
+        return strdup(path);
+
     
     const char* newpath = __private_rootfs_alloc(path);
     

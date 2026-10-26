@@ -70,6 +70,26 @@ VROOT_LOG("*vrootat_%s %d %08X %s\n", #NAME, FD, ATFLAG, PATHARG);\
     return ret;\
 }
 
+EXPORT
+int vroot_chroot(const char *path)
+{
+    if (!path) {
+        errno = EFAULT;
+        return -1;
+    }
+    char *newpath = (char *)jbroot_alloc(path);
+    if (!newpath)
+        return -1;
+
+    int ret = chroot(newpath);
+    int saved_errno = errno;
+    if (ret == 0)
+        __roothide_enter_chroot();
+    free(newpath);
+    errno = saved_errno;
+    return ret;
+}
+
 //force define
 char* realpath(const char * path, char *resolved_path);
 char* realpath$DARWIN_EXTSN(const char * path, char *resolved_path);
